@@ -1,1 +1,10 @@
 .DS_Store
+.env
+bundels/
+
+# plugin build
+node_modules/
+dist/
+package-lock.json
+__pycache__/
+.venv/
