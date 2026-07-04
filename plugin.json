@@ -2,23 +2,18 @@
   "id": "okf-export",
   "name": "OKF Export",
   "version": "1.0.0",
-  "owoxVersion": "^0.27.0",
-  "pluginApiVersion": "^1.0.0",
-  "icon": "BookMarked",
-  "author": "OWOX",
-  "description": "Export OWOX Data Marts to an Open Knowledge Format (OKF) bundle and optionally push it to GitHub.",
-  "menu": [
-    { "title": "OKF Export", "path": "", "icon": "BookMarked" },
-    { "title": "Settings", "path": "settings", "icon": "Settings" }
-  ],
-  "frontend": { "entry": "dist/frontend/index.js" },
-  "backend": { "runtime": "python", "entry": "backend.main:app" },
+  "ui": { "entry": "ui/index.html" },
+  "backend": { "entry": "backend.ts" },
+  "menu": [{ "title": "OKF Export", "path": "" }],
   "settings": [
-    { "key": "owox-api-key", "label": "OWOX API key (owox_key_...)", "type": "string", "scope": "project", "required": true },
-    { "key": "github-repo", "label": "GitHub repo (owner/repo or owner/repo/path)", "type": "string", "scope": "project" },
-    { "key": "github-token", "label": "GitHub token (ghp_... / github_pat_...)", "type": "string", "scope": "project" },
-    { "key": "sample-rows", "label": "Sample rows per mart (0 = none)", "type": "number", "scope": "project" },
-    { "key": "shared-only", "label": "Only marts available for reporting", "type": "boolean", "scope": "project" },
-    { "key": "source-link", "label": "Link resource to warehouse table/view", "type": "boolean", "scope": "project" }
+    { "key": "github-repo", "label": "GitHub repo (owner/repo or owner/repo/path)", "type": "string" },
+    { "key": "sample-rows", "label": "Sample rows per mart (0 = none)", "type": "number" },
+    { "key": "shared-only", "label": "Only marts available for reporting", "type": "boolean" },
+    { "key": "source-link", "label": "Link resource to warehouse table/view", "type": "boolean" }
+  ],
+  "credentials": [
+    { "type": "data-mart", "scope": "all" },
+    { "type": "ai-provider", "scope": "one" },
+    { "type": "github", "scope": "one" }
   ]
 }
