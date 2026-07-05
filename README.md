@@ -44,18 +44,23 @@ no Docker.**
 ## Develop
 
 ```bash
-npm install        # lucide-react is a real dependency (bundled); @owox/plugin-sdk is types-only
-npm run build:css  # precompile Tailwind → ui/styles.css (committed; the host does NOT run Tailwind)
-npm run dev        # standalone debug harness on http://localhost:5199 (see below)
+npm install        # lucide-react is a real dependency (bundled); @owox/plugin-sdk is host-provided
+npm run dev        # Vite dev server → http://localhost:5173 (UI only; brokered calls are stubbed)
 npm test           # vitest: UI (ui/App.test.tsx) + renderer (backend.test.ts)
 npm run typecheck
 ```
 
-> **Host-build alignment (AGENTS.md §7.1).** The host builds `ui/` with esbuild and does **not** run
-> Tailwind, so styling is precompiled: edit [ui/tailwind.css](ui/tailwind.css), run `npm run build:css`,
-> and commit the generated [ui/styles.css](ui/styles.css) (imported by `ui/main.tsx`). `predev`/`prebuild`
-> run it automatically. Runtime deps that get bundled (e.g. `lucide-react`) live in `dependencies`;
-> `react`/`react-dom`/`@owox/plugin-sdk` are host-provided shared deps and stay external.
+`npm run dev` aliases `@owox/plugin-sdk` to [ui/sdk-mock.ts](ui/sdk-mock.ts) so the UI runs with no host:
+`settings`/`storage` are real (localStorage-backed), while `backend.call` and the brokered capabilities
+(`owox`/`ai`/`git`) are stubbed and logged to the console. For a real export with real credentials,
+install into the host (AGENTS.md §10 Step 3).
+
+> **Host-build alignment (AGENTS.md §7.1).** The host builds `ui/` with esbuild and runs Tailwind with
+> only the **default theme** (it ignores `tailwind.config`), so our custom OWOX tokens are precompiled:
+> edit [ui/tailwind.css](ui/tailwind.css), run `npm run build:css`, and commit the generated
+> [ui/styles.css](ui/styles.css) (imported by `ui/main.tsx`; `predev`/`prebuild` run it automatically).
+> Bundled runtime deps (e.g. `lucide-react`) live in `dependencies`; `react`/`react-dom`/`@owox/plugin-sdk`
+> are host-provided shared deps and stay external — `@owox/plugin-sdk` is typed via `tsconfig` `paths`.
 
 Edit three files: [plugin.json](plugin.json) (name / menu / credentials),
 [ui/App.tsx](ui/App.tsx) (the screen), [backend.ts](backend.ts) (the export function).

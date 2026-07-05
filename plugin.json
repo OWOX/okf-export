@@ -1,7 +1,7 @@
 {
   "id": "okf-export",
   "name": "OKF Export",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "author": "OWOX",
   "description": "Export OWOX Data Marts to an Open Knowledge Format (OKF) bundle, optionally pushed to GitHub.",
   "ui": { "entry": "ui/index.html" },

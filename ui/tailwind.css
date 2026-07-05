@@ -1,6 +1,8 @@
 /* Tailwind SOURCE — precompiled to ui/styles.css via `npm run build:css`.
-   The OWOX host does NOT run Tailwind (AGENTS.md §7.1); it bundles the committed,
-   already-compiled ui/styles.css. Edit THIS file, then run build:css and commit both. */
+   The OWOX host runs Tailwind on install, but only with the DEFAULT theme — it does NOT load our
+   tailwind.config, so our custom OWOX tokens (bg-background, text-foreground, …) won't compile there.
+   So we precompile: the host bundles the committed ui/styles.css as-is (AGENTS.md §7.1). Edit THIS
+   file, run build:css, and commit both. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
