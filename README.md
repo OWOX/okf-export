@@ -23,28 +23,39 @@ them back so you can browse the exported marts in-page.
 
 ## Declared contract ([plugin.json](plugin.json))
 
-| Credential | Scope | Used for |
-|---|---|---|
-| `data-mart` | `all` | Reading marts via `ctx.owox`. |
-| `ai-provider` | `one` | The catalog-overview `ctx.ai.chat` call. |
-| `github` | `one` | Pushing the bundle via `ctx.git`. |
+| Credential | Scope | Required? | Used for |
+|---|---|---|---|
+| `data-mart` | `all` | **required** | Reading marts via `ctx.owox`. |
+| `github` | `one` | optional | Pushing the bundle via `ctx.git` (repo bound to the grant). |
+| `ai-provider` | `one` | optional | The catalog-overview `ctx.ai.chat` call. |
 
-Credential-free **settings**: `github-repo`, `sample-rows`, `shared-only`, `source-link`.
+No `settings` — the plugin is configured entirely by its granted credentials. Export
+defaults: marts available for reporting, no row samples, resource links to the OWOX data
+endpoint. When pushing, you enter the target `owner/repo` (remembered in host `storage`,
+§5); the bundle is written under `okf/` via `ctx.git.repo(repo)`.
 
 ## Install
 
 Paste `OWOX/okf-export` into the OWOX **Install from URL** field. The host fetches the source
-tarball, validates the manifest, shows the consent screen for the credentials above, collects
-settings, bundles `backend.ts`, and registers the instance. **No CI, no release tarball, no Docker.**
+tarball, **builds `ui/` and `backend.ts` itself with esbuild** (no Vite, no Tailwind), shows the
+consent screen for the credentials above, and registers the instance. **No CI, no release tarball,
+no Docker.**
 
 ## Develop
 
 ```bash
-npm install      # @owox/plugin-sdk is a types-only devDependency — install never blocks
-npm run build    # vite → dist/ui (the iframe assets)
-npm test         # vitest: UI (ui/App.test.tsx) + renderer (backend.test.ts), against ui/sdk-mock.ts
+npm install        # lucide-react is a real dependency (bundled); @owox/plugin-sdk is types-only
+npm run build:css  # precompile Tailwind → ui/styles.css (committed; the host does NOT run Tailwind)
+npm run dev        # standalone debug harness on http://localhost:5199 (see below)
+npm test           # vitest: UI (ui/App.test.tsx) + renderer (backend.test.ts)
 npm run typecheck
 ```
 
-Edit three files: [plugin.json](plugin.json) (name / menu / credentials / settings),
+> **Host-build alignment (AGENTS.md §7.1).** The host builds `ui/` with esbuild and does **not** run
+> Tailwind, so styling is precompiled: edit [ui/tailwind.css](ui/tailwind.css), run `npm run build:css`,
+> and commit the generated [ui/styles.css](ui/styles.css) (imported by `ui/main.tsx`). `predev`/`prebuild`
+> run it automatically. Runtime deps that get bundled (e.g. `lucide-react`) live in `dependencies`;
+> `react`/`react-dom`/`@owox/plugin-sdk` are host-provided shared deps and stay external.
+
+Edit three files: [plugin.json](plugin.json) (name / menu / credentials),
 [ui/App.tsx](ui/App.tsx) (the screen), [backend.ts](backend.ts) (the export function).

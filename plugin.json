@@ -1,19 +1,15 @@
 {
   "id": "okf-export",
   "name": "OKF Export",
-  "version": "1.0.0",
+  "version": "1.1.0",
+  "author": "OWOX",
+  "description": "Export OWOX Data Marts to an Open Knowledge Format (OKF) bundle, optionally pushed to GitHub.",
   "ui": { "entry": "ui/index.html" },
   "backend": { "entry": "backend.ts" },
   "menu": [{ "title": "OKF Export", "path": "" }],
-  "settings": [
-    { "key": "github-repo", "label": "GitHub repo (owner/repo or owner/repo/path)", "type": "string" },
-    { "key": "sample-rows", "label": "Sample rows per mart (0 = none)", "type": "number" },
-    { "key": "shared-only", "label": "Only marts available for reporting", "type": "boolean" },
-    { "key": "source-link", "label": "Link resource to warehouse table/view", "type": "boolean" }
-  ],
   "credentials": [
     { "type": "data-mart", "scope": "all" },
-    { "type": "ai-provider", "scope": "one" },
-    { "type": "github", "scope": "one" }
+    { "type": "github", "scope": "one", "optional": true },
+    { "type": "ai-provider", "scope": "one", "optional": true }
   ]
 }

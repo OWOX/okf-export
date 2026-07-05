@@ -1,0 +1,93 @@
+/* Tailwind SOURCE — precompiled to ui/styles.css via `npm run build:css`.
+   The OWOX host does NOT run Tailwind (AGENTS.md §7.1); it bundles the committed,
+   already-compiled ui/styles.css. Edit THIS file, then run build:css and commit both. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens replicated from the OWOX design system
+   (upstream/packages/ui/src/styles/globals.css). The sandboxed plugin iframe
+   can't import @owox/ui, so we mirror the semantic tokens + dm-* classes here
+   and follow docs/DESIGN.md. Never hardcode colors in components — use tokens. */
+@layer base {
+  :root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.3346 0.0123 279.25);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.3346 0.0123 279.25);
+    --primary: oklch(0.6179 0.2295 250.87);
+    --primary-hover: oklch(0.54 0.23 250.87);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.5148 0.0128 274.72);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: oklch(0.205 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.145 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.6179 0.2295 250.87);
+    --primary-hover: oklch(0.54 0.23 250.87);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.269 0 0);
+    --input: oklch(0.269 0 0);
+    --ring: oklch(0.556 0 0);
+  }
+
+  * {
+    border-color: var(--border);
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom utility classes from the design system (dm- prefix). */
+@layer components {
+  .dm-page {
+    @apply min-h-full;
+  }
+  .dm-page-header {
+    @apply px-8 py-4 md:px-12 md:py-6;
+  }
+  .dm-page-header-title {
+    @apply text-xl font-medium md:text-2xl;
+  }
+  .dm-page-content {
+    @apply px-4 md:px-12;
+  }
+  .dm-card {
+    @apply rounded-md border p-4;
+    /* mirrors the design system's bg-muted/50; adapts to light/dark via --muted */
+    background-color: color-mix(in oklch, var(--muted) 50%, transparent);
+  }
+  .dm-empty-state {
+    @apply flex flex-col items-center justify-center px-4 py-24;
+  }
+  .dm-empty-state-ico {
+    @apply text-muted-foreground mb-6 h-16 w-16;
+  }
+  .dm-empty-state-title {
+    @apply text-foreground mb-3 text-center text-xl font-medium;
+  }
+  .dm-empty-state-subtitle {
+    @apply text-muted-foreground mb-8 max-w-md text-center;
+  }
+}

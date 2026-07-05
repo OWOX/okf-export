@@ -1,40 +1,47 @@
 import { useEffect, useState } from 'react';
-import { settings, storage, backend, ui } from '@owox/plugin-sdk';
+import { storage, backend, ui } from '@owox/plugin-sdk';
 import { BookMarked, FileText, Loader2, Play } from 'lucide-react';
 
 type Mart = { id: string; title: string; slug: string; type: string; storage: string };
-type Summary = { count: number; pushed: string | null; at: string } | null;
+type Summary = { count: number; pushed: boolean; at: string } | null;
 
 const cellCls = 'border-b px-3 py-2';
 
 export function App() {
-  const [repo, setRepo] = useState('');
   const [marts, setMarts] = useState<Mart[]>([]);
   const [summary, setSummary] = useState<Summary>(null);
   const [doc, setDoc] = useState<{ slug: string; md: string } | null>(null);
   const [push, setPush] = useState(false);
+  const [repo, setRepo] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // Every read below is a brokered (async) call — the iframe holds no tokens.
+  // Reads are brokered (async). No settings — the plugin is configured entirely by
+  // its granted credentials (data-mart required; github + ai-provider optional). The
+  // push target repo is remembered in host storage (persistence lives there, §5).
   async function reload() {
     setMarts(((await storage.get('marts')) as Mart[]) ?? []);
     setSummary(((await storage.get('summary')) as Summary) ?? null);
   }
   useEffect(() => {
-    settings.get('github-repo').then((v) => { if (typeof v === 'string') setRepo(v); }).catch(() => {});
     reload().catch(() => {});
+    storage.get('github-repo').then((v) => { if (typeof v === 'string') setRepo(v); }).catch(() => {});
   }, []);
+
+  function onRepoChange(v: string) {
+    setRepo(v);
+    storage.set('github-repo', v).catch(() => {});
+  }
 
   async function run() {
     setBusy(true);
     setDoc(null);
     try {
-      const out = (await backend.call('exportMarts', { push })) as { count: number; pushed: string | null };
-      ui.toast(out.pushed ? `Exported & pushed to ${out.pushed}` : `Exported ${out.count} mart(s)`);
-      await reload();
+      const out = (await backend.call('exportMarts', { push, repo })) as { count: number; pushed: boolean };
+      ui.toast(out.pushed ? `Exported & pushed ${out.count} mart(s)` : `Exported ${out.count} mart(s)`);
     } catch (e) {
       ui.toast(`Failed: ${(e as Error).message}`);
     } finally {
+      await reload().catch(() => {}); // docs were persisted even if the push step failed
       setBusy(false);
     }
   }
@@ -63,29 +70,33 @@ export function App() {
 
       <div className="dm-page-content flex flex-col gap-4 pb-12">
         <p className="text-muted-foreground max-w-2xl text-sm">
-          Export OWOX Data Marts to an Open Knowledge Format bundle. Credentials (data marts, AI,
-          GitHub) are brokered by the host — this plugin stores none.
+          Export OWOX Data Marts to an Open Knowledge Format bundle. Credentials are brokered by the
+          host — the plugin stores none. Pushing to GitHub uses the optional GitHub permission.
         </p>
 
         <div className="flex flex-wrap items-center gap-4 text-sm">
-          <span className="text-muted-foreground">
-            GitHub push:{' '}
-            {repo ? <code className="text-foreground">{repo}</code> : '— set “github-repo” in Settings to enable'}
-          </span>
-          {repo && (
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={push}
-                onChange={(e) => setPush(e.target.checked)}
-                className="accent-primary size-4"
-              />
-              Push to GitHub
-            </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={push}
+              onChange={(e) => setPush(e.target.checked)}
+              className="accent-primary size-4"
+            />
+            Push to GitHub
+          </label>
+          {push && (
+            <input
+              type="text"
+              value={repo}
+              onChange={(e) => onRepoChange(e.target.value)}
+              placeholder="owner/repo"
+              aria-label="GitHub repo"
+              className="border-input focus-visible:ring-ring h-8 w-56 rounded-md border bg-transparent px-3 shadow-xs focus-visible:ring-[3px] focus-visible:outline-none"
+            />
           )}
           {summary && (
             <span className="text-muted-foreground text-xs">
-              Last: {summary.count} mart(s){summary.pushed ? ` · pushed to ${summary.pushed}` : ''}
+              Last: {summary.count} mart(s){summary.pushed ? ' · pushed' : ''}
             </span>
           )}
         </div>

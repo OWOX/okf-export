@@ -1,16 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { slugify, parseRepo, extractColumns, renderMartDoc, renderIndex, exportMarts } from './backend';
+import { slugify, extractColumns, renderMartDoc, renderIndex, exportMarts } from './backend';
 
 describe('okf renderer', () => {
   it('slugify normalizes and falls back', () => {
     expect(slugify('My Mart! (v2)', 'fb')).toBe('my-mart-v2');
     expect(slugify('', 'fb')).toBe('fb');
-  });
-
-  it('parseRepo splits repo and subdir (dropping empty segments)', () => {
-    expect(parseRepo('o/r')).toEqual({ repo: 'o/r', subdir: '' });
-    expect(parseRepo('o/r/a/b')).toEqual({ repo: 'o/r', subdir: 'a/b' });
-    expect(parseRepo('o/r/a/b/')).toEqual({ repo: 'o/r', subdir: 'a/b' });
   });
 
   it('extractColumns tolerates shapes', () => {
@@ -63,18 +57,12 @@ describe('okf renderer', () => {
 });
 
 // --------------------------------------------------------------------------- //
-// exportMarts — the brokered owox → ai → git orchestration, against a fake ctx.
+// exportMarts — brokered owox → ai → git orchestration, against a fake ctx.
+// No settings: data-mart is required; ai + git are optional grants.
 // --------------------------------------------------------------------------- //
-type CtxOpts = {
-  settings?: Record<string, unknown>;
-  pages?: any[]; // sequential responses to /api/data-marts?offset=...
-  details?: Record<string, any>; // id → mart detail
-  sample?: any[];
-  aiThrows?: boolean;
-};
+type CtxOpts = { pages?: any[]; details?: Record<string, any>; aiThrows?: boolean };
 
 function makeCtx(opts: CtxOpts = {}) {
-  const settings = opts.settings ?? {};
   const pages = opts.pages ?? [{ items: [] }];
   const details = opts.details ?? {};
   const store: Record<string, any> = {};
@@ -82,14 +70,12 @@ function makeCtx(opts: CtxOpts = {}) {
   let pageIdx = 0;
   const ctx = {
     log: () => {},
-    settings: { get: async (k: string) => settings[k] },
     owox: {
       request: async (_method: string, path: string) => {
         if (path.startsWith('/api/data-marts?')) return pages[pageIdx++] ?? { items: [] };
         const id = path.split('/').pop()!;
         return details[id] ?? { id, title: id };
       },
-      dataMart: (_id: string) => ({ query: async () => opts.sample ?? [] }),
     },
     ai: {
       chat: vi.fn(async () => {
@@ -104,7 +90,7 @@ function makeCtx(opts: CtxOpts = {}) {
 }
 
 describe('exportMarts', () => {
-  it('paginates, applies the shared-only filter, renders docs, and persists to storage', async () => {
+  it('paginates, keeps only reporting marts, renders docs, and persists to storage', async () => {
     const { ctx, store } = makeCtx({
       pages: [
         { items: [{ id: 'a', availableForReporting: true }, { id: 'b', availableForReporting: false }], nextOffset: 2 },
@@ -118,40 +104,16 @@ describe('exportMarts', () => {
 
     const res = await exportMarts({}, ctx);
 
-    expect(res.count).toBe(2); // 'b' filtered out by shared-only (default on)
-    expect(res.pushed).toBeNull();
+    expect(res.count).toBe(2); // 'b' filtered out (not available for reporting)
+    expect(res.pushed).toBe(false);
     expect(res.marts.map((m) => m.slug)).toEqual(['alpha', 'gamma']);
     expect(store['marts']).toHaveLength(2);
     expect(store['doc:alpha']).toContain('# Alpha');
-    expect(store['doc:gamma']).toContain('# Gamma');
     expect(store['index']).toContain('A tidy catalog overview.');
-    expect(store['summary']).toMatchObject({ count: 2, pushed: null });
+    expect(store['summary']).toMatchObject({ count: 2, pushed: false });
   });
 
-  it('includes non-reporting marts when shared-only is off', async () => {
-    const { ctx } = makeCtx({
-      settings: { 'shared-only': false },
-      pages: [{ items: [{ id: 'a', availableForReporting: true }, { id: 'b', availableForReporting: false }] }],
-      details: { a: { id: 'a', title: 'A' }, b: { id: 'b', title: 'B' } },
-    });
-    const res = await exportMarts({}, ctx);
-    expect(res.count).toBe(2);
-  });
-
-  it('embeds a row sample only when sample-rows > 0', async () => {
-    const { ctx, store } = makeCtx({
-      settings: { 'sample-rows': 2 },
-      pages: [{ items: [{ id: 'a', availableForReporting: true }] }],
-      details: { a: { id: 'a', title: 'Alpha' } },
-      sample: [{ x: 1 }, { x: 2 }, { x: 3 }],
-    });
-    await exportMarts({}, ctx);
-    expect(store['doc:alpha']).toContain('## Sample (first 2 rows)');
-    expect(store['doc:alpha']).toContain('{"x":1}');
-    expect(store['doc:alpha']).not.toContain('{"x":3}'); // capped at 2
-  });
-
-  it('still renders (no overview) when the AI call fails', async () => {
+  it('still renders (no overview) when the optional AI grant is missing', async () => {
     const { ctx, store } = makeCtx({
       aiThrows: true,
       pages: [{ items: [{ id: 'a', availableForReporting: true }] }],
@@ -163,24 +125,32 @@ describe('exportMarts', () => {
     expect(store['index']).not.toContain('A tidy catalog overview.');
   });
 
-  it('pushes each doc + index into the parsed repo/subdir when push is requested', async () => {
+  it('does not touch git unless push is requested', async () => {
     const { ctx, puts } = makeCtx({
-      settings: { 'github-repo': 'acme/catalog/okf' },
       pages: [{ items: [{ id: 'a', availableForReporting: true }] }],
       details: { a: { id: 'a', title: 'Alpha' } },
     });
-    const res = await exportMarts({ push: true }, ctx);
-    expect(res.pushed).toBe('acme/catalog/okf');
-    expect(puts.every((p) => p.repo === 'acme/catalog')).toBe(true);
-    expect(puts.map((p) => p.path)).toEqual(['okf/alpha.md', 'okf/index.md']);
+    await exportMarts({}, ctx);
+    expect(puts).toHaveLength(0);
   });
 
-  it('refuses to push when github-repo is not set', async () => {
+  it('pushes each doc + index under okf/ to the supplied repo when push is requested', async () => {
     const { ctx, puts } = makeCtx({
       pages: [{ items: [{ id: 'a', availableForReporting: true }] }],
       details: { a: { id: 'a', title: 'Alpha' } },
     });
-    await expect(exportMarts({ push: true }, ctx)).rejects.toThrow(/github-repo/);
+    const res = await exportMarts({ push: true, repo: 'acme/catalog' }, ctx);
+    expect(res.pushed).toBe(true);
+    expect(puts.map((p) => p.path)).toEqual(['okf/alpha.md', 'okf/index.md']);
+    expect(puts.every((p) => p.repo === 'acme/catalog')).toBe(true);
+  });
+
+  it('refuses to push without a repo', async () => {
+    const { ctx, puts } = makeCtx({
+      pages: [{ items: [{ id: 'a', availableForReporting: true }] }],
+      details: { a: { id: 'a', title: 'Alpha' } },
+    });
+    await expect(exportMarts({ push: true }, ctx)).rejects.toThrow(/repo/i);
     expect(puts).toHaveLength(0);
   });
 });

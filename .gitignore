@@ -6,3 +6,4 @@ coverage/
 # secrets — never commit
 .env
 .env.*
+!.env.example

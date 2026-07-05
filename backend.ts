@@ -14,12 +14,6 @@ export function slugify(text: string, fallback: string): string {
   return s || fallback;
 }
 
-/** 'owner/repo' or 'owner/repo/path/to/folder' → { repo, subdir }. */
-export function parseRepo(repoStr: string): { repo: string; subdir: string } {
-  const parts = (repoStr || '').split('/').filter(Boolean);
-  return { repo: parts.slice(0, 2).join('/'), subdir: parts.slice(2).join('/') };
-}
-
 function yamlScalar(v: unknown): string {
   const s = v == null ? '' : String(v);
   return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]+/g, ' ') + '"';
@@ -162,16 +156,12 @@ async function listMarts(ctx: any): Promise<Mart[]> {
   return items;
 }
 
-export async function exportMarts(input: { push?: boolean } = {}, ctx: any) {
-  const repoSetting = ((await ctx.settings.get('github-repo')) as string) || '';
-  const sampleRows = Number((await ctx.settings.get('sample-rows')) || 0);
-  const sharedOnly = (await ctx.settings.get('shared-only')) !== false; // default on
-  const sourceLink = (await ctx.settings.get('source-link')) === true; // default off
+export async function exportMarts(input: { push?: boolean; repo?: string } = {}, ctx: any) {
   const now = new Date().toISOString();
 
+  // data-mart is the one required grant. List marts available for reporting.
   ctx.log('listing data marts');
-  let stubs = await listMarts(ctx);
-  if (sharedOnly) stubs = stubs.filter((m) => m.availableForReporting);
+  const stubs = (await listMarts(ctx)).filter((m) => m.availableForReporting);
 
   const docs: Record<string, string> = {};
   const list: MartMeta[] = [];
@@ -179,30 +169,20 @@ export async function exportMarts(input: { push?: boolean } = {}, ctx: any) {
     const id = stub.id;
     ctx.log(`fetching ${id}`);
     const mart = await ctx.owox.request('GET', `/api/data-marts/${id}`);
-    let sample: any[] = [];
-    if (sampleRows > 0) {
-      try {
-        const res = await ctx.owox.dataMart(id).query();
-        const rows = Array.isArray(res) ? res : res?.rows ?? res?.data ?? [];
-        sample = rows.slice(0, sampleRows);
-      } catch {
-        /* sampling is best-effort — a mart may not be queryable */
-      }
-    }
     const title = mart.title || id;
     const slug = slugify(title, id);
-    docs[slug] = renderMartDoc(mart, sample, sourceLink, now);
+    docs[slug] = renderMartDoc(mart, [], false, now);
     list.push({ id, title, slug, type: mart.definitionType || '', storage: mart.storage?.type || '' });
   }
 
-  // One AI call for a catalog overview (the owox→ai→git chain). Optional: if the
-  // ai-provider grant is missing or the call fails, the index still renders.
+  // Optional AI overview (ai-provider is an OPTIONAL grant). If it isn't granted
+  // or the call fails, the index still renders without it.
   let overview = '';
   try {
     const reply = await ctx.ai.chat({ messages: [{ role: 'user', content: overviewPrompt(list) }] });
     overview = String(reply?.content ?? '').trim();
   } catch {
-    /* AI overview is enrichment, not required */
+    /* ai-provider not granted — enrichment only */
   }
   const indexMd = renderIndex(list, overview, now);
 
@@ -211,20 +191,20 @@ export async function exportMarts(input: { push?: boolean } = {}, ctx: any) {
   await ctx.storage.set('marts', list);
   await ctx.storage.set('index', indexMd);
 
-  // Push. The broker injects the GitHub token; the plugin never sees or stores it.
-  let pushed: string | null = null;
+  // Optional push (github is an OPTIONAL grant). The plugin supplies the target repo
+  // (§6: ctx.git.repo(input.repo)); the broker injects the token — the plugin never
+  // sees it. Throws GRANT_DENIED if the user skipped the github grant at install.
+  let pushed = false;
   if (input.push) {
-    if (!repoSetting) throw new Error('Set “github-repo” in settings before pushing.');
-    const { repo, subdir } = parseRepo(repoSetting); // subdir already trimmed of empty segments
-    const prefix = subdir ? subdir + '/' : '';
-    const g = ctx.git.repo(repo);
-    for (const [slug, md] of Object.entries(docs)) await g.putFile(`${prefix}${slug}.md`, md);
-    await g.putFile(`${prefix}index.md`, indexMd);
-    pushed = repoSetting;
+    if (!input.repo) throw new Error('A GitHub repo (owner/repo) is required to push.');
+    const g = ctx.git.repo(input.repo);
+    for (const [slug, md] of Object.entries(docs)) await g.putFile(`okf/${slug}.md`, md);
+    await g.putFile('okf/index.md', indexMd);
+    pushed = true;
   }
 
   const summary = { count: list.length, pushed, at: now };
   await ctx.storage.set('summary', summary);
-  ctx.log(`exported ${list.length} mart(s)${pushed ? ` → ${pushed}` : ''}`);
+  ctx.log(`exported ${list.length} mart(s)${pushed ? ' → pushed' : ''}`);
   return { ok: true, ...summary, marts: list };
 }
