@@ -8,7 +8,12 @@
     "skipLibCheck": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "noEmit": true,
-    "types": ["vitest/globals", "@testing-library/jest-dom"]
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    // @owox/plugin-sdk is host-provided at runtime and NOT an npm dependency (it's unpublished;
+    // a "*" range would 404 on `npm install`). Type it against the local mock so `npm run typecheck`
+    // works with no install. When the SDK is published, drop this alias and add it as a devDependency.
+    // (paths resolve relative to this tsconfig under moduleResolution "Bundler" — no baseUrl needed.)
+    "paths": { "@owox/plugin-sdk": ["./ui/sdk-mock"] }
   },
   "include": ["ui", "backend.ts", "backend.test.ts", "src"]
 }
