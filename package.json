@@ -1,18 +1,21 @@
 {
   "name": "okf-export",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build:css": "tailwindcss -i ui/tailwind.css -o ui/styles.css --minify",
     "predev": "npm run build:css",
     "dev": "vite",
+    "predev:broker": "npm run build:css",
+    "dev:broker": "OWOX_DEV_BROKER=1 vite",
     "prebuild": "npm run build:css",
     "build": "vite build",
     "test": "vitest run --poolOptions.threads.maxThreads=4",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "fflate": "^0.8.2",
     "lucide-react": "^0.469.0"
   },
   "devDependencies": {

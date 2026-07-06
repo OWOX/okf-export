@@ -1,0 +1,17 @@
+{
+  "_readme": "Copy to owox.dev.json (gitignored) for `npm run dev:broker`. Mirrors the prod vault + SettingsStore shapes (AGENTS.md §10 Step 3) so the plugin behaves identically in dev. Fill in only what you use. NEVER commit owox.dev.json.",
+
+  "owox": {
+    "apiUrl": "https://app.owox.com",
+    "apiKey": "owox_key_..."
+  },
+
+  "credentials": [
+    { "type": "github", "secret": "" },
+    { "type": "ai-provider", "secret": "" }
+  ],
+
+  "settings": { "global": {}, "byProject": {} },
+
+  "ports": { "ui": 5177, "broker": 5178 }
+}

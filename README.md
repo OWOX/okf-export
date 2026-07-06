@@ -1,38 +1,39 @@
 # okf-export — OWOX plugin (v2)
 
 Export [OWOX Data Marts](https://docs.owox.com/) to an **Open Knowledge Format (OKF)** bundle — one
-concept document per data mart (frontmatter + overview + schema) with an AI-written catalog overview —
-and optionally push the bundle to a GitHub repo.
+concept document per data mart (frontmatter + overview + schema) — and either **download it as a `.zip`**
+or **push it to a GitHub repo**.
 
-This is a **v2 (capability-broker) OWOX plugin**: a `plugin.json`, a built `ui/` (React + Tailwind,
-runs in a sandboxed iframe), and a `backend.ts` the host bundles with esbuild. The plugin holds **no
+This is a **v2 (capability-broker) OWOX plugin**: a `plugin.json`, a `ui/` (React + Tailwind, runs in a
+sandboxed iframe) the host builds with esbuild, and an optional `backend.ts`. The plugin holds **no
 credentials** — it declares what it needs and the host broker injects auth at the boundary. See the
 host's [`AGENTS.md`](https://github.com/OWOX/owox-data-marts-experimental/blob/main/AGENTS.md) for the
 full author contract.
 
-## What it does
+## What it does — a 3-step wizard ([ui/App.tsx](ui/App.tsx))
 
-`exportMarts` ([backend.ts](backend.ts)) chains three brokered capabilities and stores zero secrets:
+The UI runs entirely in the browser against the **live frontend SDK** (`owox`/`git`/`credentials`) —
+the `backend.call()` bridge isn't wired yet (AGENTS.md §6), so all work happens frontend-side:
 
-1. **`ctx.owox`** — list data marts and fetch each one's metadata/schema (and a row sample if asked).
-2. **`ctx.ai`** — one `chat` call to write a plain-English overview for the bundle index.
-3. **`ctx.git`** — `putFile` each OKF doc into the configured repo (token injected by the broker).
+1. **Filters** — availability (*shared for reporting* [default] / *shared for maintenance* / *all*, which
+   forces & disables the first two), a storage multi-select (all selected by default), and a title search.
+2. **Data marts** — the list matching those filters.
+3. **Export** — pick a destination:
+   - **Save to file** → renders the OKF bundle and downloads `okf-bundle.zip` (`index.md` + one file per mart, via [fflate](https://github.com/101arrowz/fflate)).
+   - **Export to GitHub** → checks the `github` grant (error if not granted), then commits the bundle to the `owner/repo` + folder you enter, via `git.repo(repo).putFile(...)`.
 
-Rendered docs are cached in host-owned `storage` (scoped to `(project, plugin)`); the frontend reads
-them back so you can browse the exported marts in-page.
+The pure render + filter logic lives in [okf-core.ts](okf-core.ts), shared with the cron `exportMarts`
+([backend.ts](backend.ts)) — a headless "export all reporting marts to a repo" for the host scheduler.
 
 ## Declared contract ([plugin.json](plugin.json))
 
 | Credential | Scope | Required? | Used for |
 |---|---|---|---|
-| `data-mart` | `all` | **required** | Reading marts via `ctx.owox`. |
-| `github` | `one` | optional | Pushing the bundle via `ctx.git` (repo bound to the grant). |
-| `ai-provider` | `one` | optional | The catalog-overview `ctx.ai.chat` call. |
+| `data-mart` | `all` | **required** | Listing/reading marts via `owox`. |
+| `github` | `one` | optional | The "Export to GitHub" destination via `git` (checked with `credentials.github.fetch`). |
 
-No `settings` — the plugin is configured entirely by its granted credentials. Export
-defaults: marts available for reporting, no row samples, resource links to the OWOX data
-endpoint. When pushing, you enter the target `owner/repo` (remembered in host `storage`,
-§5); the bundle is written under `okf/` via `ctx.git.repo(repo)`.
+No `settings` — the plugin is driven by its granted credentials and the in-UI wizard. "Save to file"
+needs only `data-mart`; "Export to GitHub" additionally needs the optional `github` grant.
 
 ## Install
 
@@ -44,16 +45,26 @@ no Docker.**
 ## Develop
 
 ```bash
-npm install        # lucide-react is a real dependency (bundled); @owox/plugin-sdk is host-provided
-npm run dev        # Vite dev server → http://localhost:5173 (UI only; brokered calls are stubbed)
-npm test           # vitest: UI (ui/App.test.tsx) + renderer (backend.test.ts)
+npm install                              # lucide-react bundled; @owox/plugin-sdk is host-provided
+npm run dev                              # UI only, stubbed brokered calls → http://localhost:5173
+cp owox.dev.example.json owox.dev.json   # then paste creds (gitignored); see below
+npm run dev:broker                       # REAL data marts, real export   → http://localhost:5177
+npm test                                 # vitest: UI + renderer
 npm run typecheck
 ```
 
-`npm run dev` aliases `@owox/plugin-sdk` to [ui/sdk-mock.ts](ui/sdk-mock.ts) so the UI runs with no host:
-`settings`/`storage` are real (localStorage-backed), while `backend.call` and the brokered capabilities
-(`owox`/`ai`/`git`) are stubbed and logged to the console. For a real export with real credentials,
-install into the host (AGENTS.md §10 Step 3).
+Two local modes:
+
+- **`npm run dev`** (AGENTS.md §10 Step 2) — aliases `@owox/plugin-sdk` to [ui/sdk-mock.ts](ui/sdk-mock.ts):
+  `settings`/`storage` are real (localStorage-backed); `backend.call` and brokered `owox`/`ai`/`git` are
+  stubbed and console-logged. Fast UI iteration, no host, no creds.
+- **`npm run dev:broker`** (§10 Step 3) — runs the real [backend.ts](backend.ts) in the browser against a
+  Vite-side capability broker ([dev-broker.ts](dev-broker.ts)) fed from **[owox.dev.json](owox.dev.example.json)**
+  (gitignored, §10 Step 3 shape: `owox.apiKey` = an `owox_key_…`; optional `github`/`ai-provider` secrets).
+  So **Run export** lists your real data marts and generates real OKF docs with no host install. Copy the
+  OWOX key from your host's `secrets/` into `owox.dev.json` once — the run reads only that local file, never
+  the host at runtime. `ai` is stubbed; `git` pushes only if a `github` secret is set (else logs). Falls
+  back to canned sample data if `owox.apiKey` is empty.
 
 > **Host-build alignment (AGENTS.md §7.1).** The host builds `ui/` with esbuild and runs Tailwind with
 > only the **default theme** (it ignores `tailwind.config`), so our custom OWOX tokens are precompiled:

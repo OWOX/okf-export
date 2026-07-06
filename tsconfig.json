@@ -15,5 +15,5 @@
     // (paths resolve relative to this tsconfig under moduleResolution "Bundler" — no baseUrl needed.)
     "paths": { "@owox/plugin-sdk": ["./ui/sdk-mock"] }
   },
-  "include": ["ui", "backend.ts", "backend.test.ts", "src"]
+  "include": ["ui", "backend.ts", "backend.test.ts", "okf-core.ts", "src"]
 }

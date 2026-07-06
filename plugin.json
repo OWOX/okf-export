@@ -1,15 +1,15 @@
 {
   "id": "okf-export",
   "name": "OKF Export",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "author": "OWOX",
-  "description": "Export OWOX Data Marts to an Open Knowledge Format (OKF) bundle, optionally pushed to GitHub.",
+  "description": "Export OWOX Data Marts to an Open Knowledge Format (OKF) bundle — download a .zip or push to GitHub.",
   "ui": { "entry": "ui/index.html" },
   "backend": { "entry": "backend.ts" },
   "menu": [{ "title": "OKF Export", "path": "" }],
   "credentials": [
     { "type": "data-mart", "scope": "all" },
-    { "type": "github", "scope": "one", "optional": true },
-    { "type": "ai-provider", "scope": "one", "optional": true }
+    { "type": "storage", "scope": "all", "optional": true },
+    { "type": "github", "scope": "one", "optional": true }
   ]
 }
