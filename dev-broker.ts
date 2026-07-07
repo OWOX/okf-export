@@ -23,6 +23,18 @@ function parseApiKey(key: string) {
   return { apiOrigin: String(o.apiOrigin).replace(/\/$/, ''), apiKeyId: o.apiKeyId, apiKeySecret: o.apiKeySecret };
 }
 
+// SSRF guard: the client only supplies a path; pin the host by resolving against `base`
+// and asserting the origin didn't change (rejects `//evil`, `/@evil`, absolute URLs, etc.),
+// so an injected token never leaves the intended host.
+function safeUrl(path: string, base: string): URL {
+  if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) {
+    throw new Error(`dev-broker: unsafe path "${String(path).slice(0, 40)}"`);
+  }
+  const u = new URL(path, base);
+  if (u.origin !== new URL(base).origin) throw new Error(`dev-broker: path escapes ${base}`);
+  return u;
+}
+
 export function devBroker(cfg: DevConfig): Plugin {
   let auth: { origin: string; token: string; keyId: string } | null = null;
   const secretFor = (type: string) => cfg.credentials?.find((c) => c.type === type)?.secret || '';
@@ -53,7 +65,7 @@ export function devBroker(cfg: DevConfig): Plugin {
       const hasBody = body != null; // guards GET/HEAD: a JSON-tunnelled `undefined` arrives as null
       const call = async () => {
         const a = await owoxAuth();
-        return fetch(a.origin + path, {
+        return fetch(safeUrl(path, a.origin), {
           method: m,
           headers: {
             Authorization: `Bearer ${a.token}`,
@@ -77,7 +89,7 @@ export function devBroker(cfg: DevConfig): Plugin {
       const secret = secretFor(grant);
       if (!secret) throw Object.assign(new Error(`no ${grant} secret in owox.dev.json`), { code: 'GRANT_DENIED' });
       if (grant !== 'github') throw Object.assign(new Error(`dev-broker: only github escape-hatch is wired`), { code: 'DEV_BROKER' });
-      const res = await fetch(`https://api.github.com${path}`, {
+      const res = await fetch(safeUrl(path, 'https://api.github.com'), {
         ...init,
         headers: { Authorization: `Bearer ${secret}`, Accept: 'application/vnd.github+json', ...(init?.headers as any) },
       });
@@ -87,42 +99,30 @@ export function devBroker(cfg: DevConfig): Plugin {
       // ai-provider is OPTIONAL. Stubbed unless owox.dev.json carries an ai-provider secret you wire up.
       return { content: '(dev-broker: AI stubbed — add an ai-provider secret in owox.dev.json to wire it)' };
     }
-    if (capability === 'git' && method === 'putFile') {
-      // github is OPTIONAL. Args match the real SDK: a single { repo, path, content }. Real push only
-      // when owox.dev.json has a github secret (repo comes from the plugin); otherwise log.
-      const { repo, path, content } = (args[0] ?? {}) as { repo?: string; path?: string; content?: string };
-      const token = secretFor('github');
-      const branch = 'main';
-      if (!token || !repo || !path) {
-        console.log('[dev-broker] git putFile (log only — add a github secret in owox.dev.json to push):', path);
-        return { ok: true, logged: true };
-      }
-      const url = `https://api.github.com/repos/${repo}/contents/${path}`;
-      const h = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };
-      const cur = await fetch(`${url}?ref=${branch}`, { headers: h });
-      const sha = cur.ok ? (await cur.json()).sha : undefined;
-      const put = await fetch(url, {
-        method: 'PUT',
-        headers: { ...h, 'content-type': 'application/json' },
-        body: JSON.stringify({
-          message: `okf-export: ${path}`,
-          content: Buffer.from(content ?? '', 'utf8').toString('base64'),
-          branch,
-          ...(sha ? { sha } : {}),
-        }),
-      });
-      if (!put.ok) throw new Error(`GitHub PUT ${path} → HTTP ${put.status}: ${(await put.text()).slice(0, 200)}`);
-      console.log('[dev-broker] git pushed', `${repo}:${path}`);
-      return { ok: true };
-    }
+    // The frontend GitHub flow goes through the `credentials` escape hatch above; the old
+    // `git` capability handler was removed (unused, and an extra credentialed attack surface).
     throw new Error(`dev-broker: unsupported ${capability}.${method}`);
   }
+
+  const uiPort = cfg.ports?.ui ?? 5177;
 
   return {
     name: 'owox-dev-broker',
     configureServer(server) {
       server.middlewares.use('/__broker', (req, res) => {
         if (req.method !== 'POST') { res.statusCode = 405; res.end('POST only'); return; }
+        // CSRF guard: this endpoint injects live tokens, so only accept same-origin JSON
+        // (a cross-origin page can't set application/json without a preflight the dev server
+        // won't answer, and any present Origin must be our own dev server).
+        const origin = req.headers.origin;
+        if (origin) {
+          let ok = false;
+          try { const u = new URL(origin); ok = (u.hostname === 'localhost' || u.hostname === '127.0.0.1') && u.port === String(uiPort); } catch { ok = false; }
+          if (!ok) { res.statusCode = 403; res.end('bad origin'); return; }
+        }
+        if (!String(req.headers['content-type'] || '').toLowerCase().startsWith('application/json')) {
+          res.statusCode = 415; res.end('application/json required'); return;
+        }
         let raw = '';
         req.on('data', (c) => (raw += c));
         req.on('end', async () => {
