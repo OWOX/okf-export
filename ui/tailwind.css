@@ -62,41 +62,47 @@
 }
 
 /* Custom utility classes from the design system (dm- prefix). */
+/* OWOX host page chrome — EXPLICIT values (AGENTS.md §7.1, copied from
+   packages/plugin-starter/ui/styles.css). The host compiles plugin CSS with the DEFAULT
+   Tailwind theme, where `rounded-md` = 6px and tokens like `muted` don't exist — so the card
+   radius/fill are written literally (8px corner, gray-200 bottom border, muted/50 fill) so the
+   corner + color match the host app instead of rendering a 6px "slightly different" corner.
+   Kept in @layer components so utilities (e.g. p-0 on the table card) still override. */
 @layer components {
   .dm-page {
-    @apply min-h-full;
+    min-height: 100%;
   }
   .dm-page-header {
-    @apply px-8 py-4 md:px-12 md:py-6;
+    padding: 1rem 2rem;
   }
   .dm-page-header-title {
-    @apply text-xl font-medium md:text-2xl;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+    font-weight: 500;
   }
   .dm-page-content {
-    @apply px-4 md:px-12;
+    padding-inline: 1rem;
   }
-  /* Exactly the OWOX .dm-card (AGENTS.md): one subtle BOTTOM border, not a full box.
-     = bg-muted/50 rounded-md border-b border-gray-200 p-4 dark:border-white/4 dark:bg-white/4
-     (bg-muted/50 + the /4 dark values are written explicitly — Tailwind's alpha modifier can't
-     @apply to the var(--muted) token, and `/4` isn't a default opacity step for @apply.) */
   .dm-card {
-    @apply rounded-md border-b border-gray-200 p-4;
-    background-color: color-mix(in oklch, var(--muted) 50%, transparent);
+    padding: 1rem;
+    border-radius: 8px; /* host --radius (0.625rem) − 2px; NOT default rounded-md (6px) */
+    border-bottom: 1px solid #e5e7eb; /* gray-200; a single bottom border, not a full box */
+    background-color: color-mix(in oklch, oklch(0.97 0 0) 50%, transparent); /* ≈ muted/50 */
   }
   .dark .dm-card {
-    border-bottom-color: rgb(255 255 255 / 0.04);
-    background-color: rgb(255 255 255 / 0.04);
+    border-bottom-color: rgba(255, 255, 255, 0.04);
+    background-color: rgba(255, 255, 255, 0.04);
   }
-  .dm-empty-state {
-    @apply flex flex-col items-center justify-center px-4 py-24;
-  }
-  .dm-empty-state-ico {
-    @apply text-muted-foreground mb-6 h-16 w-16;
-  }
-  .dm-empty-state-title {
-    @apply text-foreground mb-3 text-center text-xl font-medium;
-  }
-  .dm-empty-state-subtitle {
-    @apply text-muted-foreground mb-8 max-w-md text-center;
+  @media (min-width: 768px) {
+    .dm-page-header {
+      padding: 1.5rem 3rem;
+    }
+    .dm-page-header-title {
+      font-size: 1.5rem;
+      line-height: 2rem;
+    }
+    .dm-page-content {
+      padding-inline: 3rem;
+    }
   }
 }
