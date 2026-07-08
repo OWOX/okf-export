@@ -75,10 +75,17 @@
   .dm-page-content {
     @apply px-4 md:px-12;
   }
+  /* Exactly the OWOX .dm-card (AGENTS.md): one subtle BOTTOM border, not a full box.
+     = bg-muted/50 rounded-md border-b border-gray-200 p-4 dark:border-white/4 dark:bg-white/4
+     (bg-muted/50 + the /4 dark values are written explicitly — Tailwind's alpha modifier can't
+     @apply to the var(--muted) token, and `/4` isn't a default opacity step for @apply.) */
   .dm-card {
-    @apply rounded-md border p-4;
-    /* mirrors the design system's bg-muted/50; adapts to light/dark via --muted */
+    @apply rounded-md border-b border-gray-200 p-4;
     background-color: color-mix(in oklch, var(--muted) 50%, transparent);
+  }
+  .dark .dm-card {
+    border-bottom-color: rgb(255 255 255 / 0.04);
+    background-color: rgb(255 255 255 / 0.04);
   }
   .dm-empty-state {
     @apply flex flex-col items-center justify-center px-4 py-24;

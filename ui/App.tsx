@@ -325,15 +325,15 @@ export function App() {
             </div>
           </div>
         ) : (
-          /* ── Step 2: destination ─────────────────────────────────────── */
-          <div className="flex flex-col gap-4" data-testid="step-export">
+          /* ── Step 2: destination (primary content wrapped in a .dm-card) ─ */
+          <div className="dm-card flex flex-col gap-4" data-testid="step-export">
             <div className="grid gap-3 sm:grid-cols-2">
               <DestCard icon={<Github className="h-5 w-5" />} title="Export to GitHub" desc="Commit the OKF bundle to a repository." selected={dest === 'github'} onClick={pickGithub} testid="dest-github" />
               <DestCard icon={<Download className="h-5 w-5" />} title="Save to file" desc="Download the OKF bundle as a .zip." selected={dest === 'file'} onClick={() => setDest('file')} testid="dest-file" />
             </div>
 
             {dest === 'github' && (
-              <div className="dm-card flex flex-col gap-4">
+              <div className="flex flex-col gap-4">
                 {ghGranted === false ? (
                   <Banner kind="error" text="No GitHub credential is granted. Remove and reinstall the plugin, then grant GitHub on the consent screen (it's an optional permission)." />
                 ) : ghGranted === null ? (
@@ -356,7 +356,7 @@ export function App() {
             )}
 
             {dest === 'file' && (
-              <div className="dm-card flex items-center gap-3">
+              <div className="flex items-center gap-3">
                 <button className={btnOutline} onClick={() => setStep(1)}><ArrowLeft className="h-4 w-4" /> Back</button>
                 <button className={btnPrimary} onClick={runFile} disabled={busy} data-testid="run-file">
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
