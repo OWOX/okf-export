@@ -57,7 +57,10 @@
     border-color: var(--border);
   }
   body {
-    @apply bg-background text-foreground;
+    /* No background: let the host's rounded content panel show through the
+       iframe corners (the iframe is transparent). ponytail: bg lived on body
+       and squared off the host's rounded corners. */
+    @apply text-foreground;
   }
 }
 
